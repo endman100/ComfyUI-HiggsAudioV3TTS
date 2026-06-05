@@ -11,7 +11,7 @@
       ],
       "size": [
         430,
-        230
+        120
       ],
       "flags": {},
       "order": 0,
@@ -37,14 +37,8 @@
         "Node name for S&R": "HiggsAudioV3ModelLoader"
       },
       "widgets_values": [
-        "python_worker",
-        "python",
         "bosonai/higgs-audio-v3-tts-4b",
-        "",
-        "cuda",
-        "triton",
-        true,
-        600
+        "cuda"
       ]
     },
     {
@@ -88,10 +82,10 @@
         "Node name for S&R": "HiggsAudioV3LocalTTS"
       },
       "widgets_values": [
-        "Hello, this is Higgs Audio v3 running directly inside ComfyUI without a manually started speech server.",
+        "Hello, this is Higgs Audio v3 running directly inside ComfyUI.",
         0.8,
         50,
-        1024,
+        256,
         300,
         "",
         ""
@@ -155,7 +149,7 @@
         0
       ]
     },
-    "notes": "No-manual-server workflow. The loader starts the local SGLang-Omni Higgs pipeline inside ComfyUI and passes the model object to Local TTS."
+    "notes": "No-manual-server workflow. The loader starts a local Higgs pipeline managed by the ComfyUI node and passes the model object to Local TTS."
   },
   "version": 0.4
 }

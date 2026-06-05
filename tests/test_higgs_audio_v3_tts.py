@@ -16,7 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(__file__))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from nodes import HiggsAudioV3LocalTTS, HiggsAudioV3TTS  # noqa: E402
+from nodes import HiggsAudioV3LocalTTS, HiggsAudioV3ModelLoader, HiggsAudioV3TTS  # noqa: E402
 
 
 def _wav_bytes() -> bytes:
@@ -155,3 +155,15 @@ def test_local_tts_uses_loaded_model_without_http():
     _assert_audio(audio)
     assert json.loads(request_json)["input"] == "Local hello"
     assert model.payloads[0][0]["input"] == "Local hello"
+
+
+def test_model_loader_ui_hides_runtime_internals():
+    inputs = HiggsAudioV3ModelLoader.INPUT_TYPES()["required"]
+
+    assert list(inputs) == ["model_path", "device"]
+    assert "runtime_mode" not in inputs
+    assert "python_executable" not in inputs
+    assert "sglang_omni_python_path" not in inputs
+    assert "attention_backend" not in inputs
+    assert "disable_cuda_graph" not in inputs
+    assert "startup_timeout_seconds" not in inputs

@@ -1,5 +1,7 @@
 from .nodes import HiggsAudioV3LocalTTS, HiggsAudioV3ModelLoader, HiggsAudioV3TTS
 
+WEB_DIRECTORY = "./js"
+
 NODE_CLASS_MAPPINGS = {
     "HiggsAudioV3TTS": HiggsAudioV3TTS,
     "HiggsAudioV3ModelLoader": HiggsAudioV3ModelLoader,
@@ -12,7 +14,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "HiggsAudioV3LocalTTS": "Higgs Audio V3 Local TTS",
 }
 
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
+__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
 
 __version__ = "0.1.0"
 

@@ -39,21 +39,20 @@ You do not have to manually run `sgl-omni serve` if you use:
 Higgs Audio V3 Model Loader -> Higgs Audio V3 Local TTS -> SaveAudio
 ```
 
-This mode starts the SGLang-Omni Higgs pipeline from inside ComfyUI and calls it directly, without exposing an HTTP server. It still requires the SGLang-Omni Python package and its model dependencies to be installed in the same Python environment that runs ComfyUI.
+This mode starts a local Higgs pipeline managed by the ComfyUI node and calls it directly, without exposing an HTTP server. The loader UI intentionally stays small: `model_path` and `device`.
 
-By default the loader uses `runtime_mode=python_worker`. This starts a local worker process managed by the node, so you can point `python_executable` at an environment where SGLang-Omni is already installed without changing ComfyUI's Python packages. It does not open an HTTP port. `python_executable` may be either a Python executable path or a command prefix such as `python`, `/path/to/venv/bin/python`, or a WSL launcher command.
-
-If you prefer to load everything in the ComfyUI process, use `runtime_mode=in_process`; only do this when SGLang-Omni is installed in the ComfyUI Python environment and its dependency versions are compatible.
-
-If you use an editable SGLang-Omni checkout instead of an installed package, set `sglang_omni_python_path` on the loader node to the checkout path that contains the `sglang_omni` package.
-
-Recommended loader settings for systems without a local CUDA toolkit are:
+By default the loader starts a node-managed Python worker using the current Python executable. If SGLang-Omni is installed in a different Python environment, configure it with environment variables before starting ComfyUI:
 
 ```text
-attention_backend = triton
-disable_cuda_graph = true
-device = cuda
+HIGGS_AUDIO_V3_PYTHON_EXECUTABLE=/path/to/python
+HIGGS_AUDIO_V3_RUNTIME_MODE=python_worker
+HIGGS_AUDIO_V3_SGLANG_OMNI_PYTHON_PATH=/optional/editable/checkout
+HIGGS_AUDIO_V3_ATTENTION_BACKEND=triton
+HIGGS_AUDIO_V3_DISABLE_CUDA_GRAPH=true
+HIGGS_AUDIO_V3_STARTUP_TIMEOUT_SECONDS=600
 ```
+
+Use `HIGGS_AUDIO_V3_RUNTIME_MODE=in_process` only when SGLang-Omni is installed in the ComfyUI Python environment and its dependency versions are compatible.
 
 ## Start Higgs Server
 
@@ -123,6 +122,7 @@ If you use reference audio from ComfyUI with a Docker-hosted server, make sure t
 - `reference_audio_path`: optional server-visible local path or URL for voice cloning
 - `reference_text`: transcript for the reference audio
 - `temperature`, `top_k`, `max_new_tokens`: sampling controls sent to the API
+- `Higgs Audio V3 Model Loader`: local loader with `model_path` and `device`
 
 ## Examples
 

@@ -36,10 +36,41 @@ except Exception:  # pragma: no cover
 DEFAULT_SERVER_URL = "http://127.0.0.1:8000"
 DEFAULT_MODEL_PATH = "bosonai/higgs-audio-v3-tts-4b"
 DEFAULT_SAMPLE_RATE = 24000
+DEFAULT_RUNTIME_MODE = "python_worker"
+DEFAULT_PYTHON_EXECUTABLE = sys.executable
+DEFAULT_SGLANG_OMNI_PYTHON_PATH = ""
+DEFAULT_ATTENTION_BACKEND = "triton"
+DEFAULT_DISABLE_CUDA_GRAPH = True
+DEFAULT_STARTUP_TIMEOUT_SECONDS = 600
 RESPONSE_MODES = ["standard_wav", "stream_sse_wav", "stream_pcm"]
 LOCAL_MODEL_TYPE = "HIGGS_AUDIO_V3_MODEL"
 _LOCAL_MODEL_CACHE: dict[tuple[Any, ...], Any] = {}
 _WORKER_MARKER = "__HIGGS_AUDIO_V3_JSON__"
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _higgs_runtime_config() -> dict[str, Any]:
+    return {
+        "runtime_mode": os.getenv("HIGGS_AUDIO_V3_RUNTIME_MODE", DEFAULT_RUNTIME_MODE).strip() or DEFAULT_RUNTIME_MODE,
+        "python_executable": os.getenv("HIGGS_AUDIO_V3_PYTHON_EXECUTABLE", DEFAULT_PYTHON_EXECUTABLE).strip()
+        or DEFAULT_PYTHON_EXECUTABLE,
+        "sglang_omni_python_path": os.getenv(
+            "HIGGS_AUDIO_V3_SGLANG_OMNI_PYTHON_PATH",
+            DEFAULT_SGLANG_OMNI_PYTHON_PATH,
+        ).strip(),
+        "attention_backend": os.getenv("HIGGS_AUDIO_V3_ATTENTION_BACKEND", DEFAULT_ATTENTION_BACKEND).strip()
+        or DEFAULT_ATTENTION_BACKEND,
+        "disable_cuda_graph": _env_bool("HIGGS_AUDIO_V3_DISABLE_CUDA_GRAPH", DEFAULT_DISABLE_CUDA_GRAPH),
+        "startup_timeout_seconds": int(
+            os.getenv("HIGGS_AUDIO_V3_STARTUP_TIMEOUT_SECONDS", str(DEFAULT_STARTUP_TIMEOUT_SECONDS))
+        ),
+    }
 
 
 def _clean_server_url(server_url: str) -> str:
@@ -665,26 +696,14 @@ class HiggsAudioV3ModelLoader:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "runtime_mode": (["python_worker", "in_process"], {"default": "python_worker"}),
-                "python_executable": (
+                "model_path": (
                     "STRING",
                     {
-                        "default": "python",
-                        "tooltip": "Python executable for python_worker mode. Use an environment with sglang_omni installed.",
-                    },
-                ),
-                "model_path": ("STRING", {"default": DEFAULT_MODEL_PATH}),
-                "sglang_omni_python_path": (
-                    "STRING",
-                    {
-                        "default": "",
-                        "tooltip": "Optional path to an editable sglang-omni checkout when it is not installed in ComfyUI's Python environment.",
+                        "default": DEFAULT_MODEL_PATH,
+                        "tooltip": "Hugging Face model id or local model directory.",
                     },
                 ),
                 "device": (["cuda", "cpu"], {"default": "cuda"}),
-                "attention_backend": (["triton", "flashinfer", "default"], {"default": "triton"}),
-                "disable_cuda_graph": ("BOOLEAN", {"default": True}),
-                "startup_timeout_seconds": ("INT", {"default": 600, "min": 30, "max": 3600, "step": 30}),
             }
         }
 
@@ -696,15 +715,17 @@ class HiggsAudioV3ModelLoader:
 
     def load_model(
         self,
-        runtime_mode: str,
-        python_executable: str,
         model_path: str,
-        sglang_omni_python_path: str,
         device: str,
-        attention_backend: str,
-        disable_cuda_graph: bool,
-        startup_timeout_seconds: int,
     ):
+        runtime_config = _higgs_runtime_config()
+        runtime_mode = runtime_config["runtime_mode"]
+        python_executable = runtime_config["python_executable"]
+        sglang_omni_python_path = runtime_config["sglang_omni_python_path"]
+        attention_backend = runtime_config["attention_backend"]
+        disable_cuda_graph = runtime_config["disable_cuda_graph"]
+        startup_timeout_seconds = runtime_config["startup_timeout_seconds"]
+
         model_path = (model_path or DEFAULT_MODEL_PATH).strip()
         key = (
             runtime_mode,
@@ -745,10 +766,7 @@ class HiggsAudioV3ModelLoader:
         info = {
             "model_path": model_path,
             "runtime_mode": runtime_mode,
-            "python_executable": (python_executable or "python").strip(),
             "device": device,
-            "attention_backend": attention_backend,
-            "disable_cuda_graph": bool(disable_cuda_graph),
             "mode": "local_pipeline",
         }
         return (model, json.dumps(info, ensure_ascii=False, indent=2))
