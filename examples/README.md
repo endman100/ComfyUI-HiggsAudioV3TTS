@@ -23,6 +23,12 @@ These workflows assume:
 - `higgs_audio_v3_tts_reference_audio_input_api_prompt.json`
   - API `/prompt` version of the `LoadAudio` reference input workflow.
 
+- `higgs_audio_v3_tts_local_model_workflow.json`
+  - Drag this into the ComfyUI UI to test the no-manual-server path:
+    `Higgs Audio V3 Model Loader -> Higgs Audio V3 Local TTS -> SaveAudio`.
+  - Default mode is `python_worker`, which requires `python_executable` to point at a Python environment where `sglang_omni` is importable.
+  - This mode does not open an HTTP server.
+
 ## Expected Output
 
 The all-features workflow writes FLAC files under:

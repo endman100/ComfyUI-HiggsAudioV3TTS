@@ -16,7 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(__file__))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from nodes import HiggsAudioV3TTS  # noqa: E402
+from nodes import HiggsAudioV3LocalTTS, HiggsAudioV3TTS  # noqa: E402
 
 
 def _wav_bytes() -> bytes:
@@ -131,3 +131,27 @@ def test_reference_audio_payload_contains_reference():
         assert payload["references"][0]["audio_path"].endswith(".wav")
     finally:
         httpd.shutdown()
+
+
+class FakeLocalModel:
+    def __init__(self):
+        self.payloads = []
+
+    def speech(self, payload, timeout_seconds):
+        self.payloads.append((payload, timeout_seconds))
+        return _wav_bytes()
+
+
+def test_local_tts_uses_loaded_model_without_http():
+    model = FakeLocalModel()
+    audio, request_json = HiggsAudioV3LocalTTS().generate(
+        model,
+        "Local hello",
+        0.8,
+        50,
+        1024,
+        10,
+    )
+    _assert_audio(audio)
+    assert json.loads(request_json)["input"] == "Local hello"
+    assert model.payloads[0][0]["input"] == "Local hello"

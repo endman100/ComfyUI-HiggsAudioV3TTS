@@ -10,6 +10,7 @@ The node talks to the official SGLang-Omni `/v1/audio/speech` API and returns na
 - Voice cloning through `references`
 - SSE streaming WAV chunks
 - Raw PCM streaming
+- Direct local pipeline mode with a ComfyUI-style model loader node
 - Inline Higgs control tokens such as `<|emotion:amusement|>`, `<|style:shouting|>`, `<|prosody:pause|>`, and `<|sfx:laughter|>Haha`
 
 Higgs Audio v3 is released by Boson AI for research and non-commercial use. Review the model license before using generated audio.
@@ -30,9 +31,33 @@ source /path/to/comfyui-venv/bin/activate
 pip install -r custom_nodes/ComfyUI-HiggsAudioV3TTS/requirements.txt
 ```
 
+## Direct Local Pipeline Mode
+
+You do not have to manually run `sgl-omni serve` if you use:
+
+```text
+Higgs Audio V3 Model Loader -> Higgs Audio V3 Local TTS -> SaveAudio
+```
+
+This mode starts the SGLang-Omni Higgs pipeline from inside ComfyUI and calls it directly, without exposing an HTTP server. It still requires the SGLang-Omni Python package and its model dependencies to be installed in the same Python environment that runs ComfyUI.
+
+By default the loader uses `runtime_mode=python_worker`. This starts a local worker process managed by the node, so you can point `python_executable` at an environment where SGLang-Omni is already installed without changing ComfyUI's Python packages. It does not open an HTTP port. `python_executable` may be either a Python executable path or a command prefix such as `python`, `/path/to/venv/bin/python`, or a WSL launcher command.
+
+If you prefer to load everything in the ComfyUI process, use `runtime_mode=in_process`; only do this when SGLang-Omni is installed in the ComfyUI Python environment and its dependency versions are compatible.
+
+If you use an editable SGLang-Omni checkout instead of an installed package, set `sglang_omni_python_path` on the loader node to the checkout path that contains the `sglang_omni` package.
+
+Recommended loader settings for systems without a local CUDA toolkit are:
+
+```text
+attention_backend = triton
+disable_cuda_graph = true
+device = cuda
+```
+
 ## Start Higgs Server
 
-The model is served separately by SGLang-Omni.
+The original `Higgs Audio V3 TTS` node can still talk to a separately served SGLang-Omni HTTP API. Use this mode when you want to share one Higgs service across multiple ComfyUI sessions or machines.
 
 ```bash
 docker pull lmsysorg/sglang-omni:dev

@@ -1,0 +1,161 @@
+{
+  "last_node_id": 3,
+  "last_link_id": 2,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "HiggsAudioV3ModelLoader",
+      "pos": [
+        80,
+        120
+      ],
+      "size": [
+        430,
+        230
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "HIGGS_AUDIO_V3_MODEL",
+          "links": [
+            1
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "model_info",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "HiggsAudioV3ModelLoader"
+      },
+      "widgets_values": [
+        "python_worker",
+        "python",
+        "bosonai/higgs-audio-v3-tts-4b",
+        "",
+        "cuda",
+        "triton",
+        true,
+        600
+      ]
+    },
+    {
+      "id": 2,
+      "type": "HiggsAudioV3LocalTTS",
+      "pos": [
+        580,
+        80
+      ],
+      "size": [
+        430,
+        330
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "HIGGS_AUDIO_V3_MODEL",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [
+            2
+          ],
+          "slot_index": 0
+        },
+        {
+          "name": "request_json",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "HiggsAudioV3LocalTTS"
+      },
+      "widgets_values": [
+        "Hello, this is Higgs Audio v3 running directly inside ComfyUI without a manually started speech server.",
+        0.8,
+        50,
+        1024,
+        300,
+        "",
+        ""
+      ]
+    },
+    {
+      "id": 3,
+      "type": "SaveAudio",
+      "pos": [
+        1080,
+        150
+      ],
+      "size": [
+        360,
+        120
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "link": 2
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "SaveAudio"
+      },
+      "widgets_values": [
+        "higgs_audio_v3_tts/local_model_tts"
+      ]
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "HIGGS_AUDIO_V3_MODEL"
+    ],
+    [
+      2,
+      2,
+      0,
+      3,
+      0,
+      "AUDIO"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1,
+      "offset": [
+        0,
+        0
+      ]
+    },
+    "notes": "No-manual-server workflow. The loader starts the local SGLang-Omni Higgs pipeline inside ComfyUI and passes the model object to Local TTS."
+  },
+  "version": 0.4
+}
