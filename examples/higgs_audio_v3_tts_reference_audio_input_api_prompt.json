@@ -1,0 +1,39 @@
+{
+  "client_id": "higgs-audio-v3-tts-reference-audio-input",
+  "prompt": {
+    "1": {
+      "class_type": "LoadAudio",
+      "inputs": {
+        "audio": "RunComfy_examples_1437_2.mp3"
+      }
+    },
+    "2": {
+      "class_type": "HiggsAudioV3TTS",
+      "inputs": {
+        "server_url": "http://127.0.0.1:8000",
+        "text": "This branch tests the connected ComfyUI AUDIO reference input for voice cloning.",
+        "response_mode": "standard_wav",
+        "temperature": 0.8,
+        "top_k": 50,
+        "max_new_tokens": 512,
+        "timeout_seconds": 300,
+        "reference_audio": [
+          "1",
+          0
+        ],
+        "reference_text": "Replace this with the exact transcript of the loaded reference audio for best cloning fidelity."
+      }
+    },
+    "3": {
+      "class_type": "SaveAudio",
+      "inputs": {
+        "audio": [
+          "2",
+          0
+        ],
+        "filename_prefix": "higgs_audio_v3_tts/reference_audio_input"
+      }
+    }
+  }
+}
+

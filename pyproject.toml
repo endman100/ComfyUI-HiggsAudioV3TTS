@@ -1,0 +1,11 @@
+[project]
+name = "comfyui-higgs-audio-v3-tts"
+version = "0.1.0"
+description = "ComfyUI custom node for bosonai/higgs-audio-v3-tts-4b through SGLang-Omni"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "requests>=2.28.0",
+    "soundfile>=0.12.1",
+]
