@@ -41,6 +41,15 @@ Higgs Audio V3 Model Loader -> Higgs Audio V3 Local TTS -> SaveAudio
 
 This mode starts a local Higgs pipeline managed by the ComfyUI node and calls it directly, without exposing an HTTP server. The loader UI intentionally stays small: `model_path` and `device`.
 
+The `model_path` widget follows the usual ComfyUI model-directory pattern. Put a local copy under either of these roots and select the relative model name in the loader:
+
+```text
+ComfyUI/models/higgs_audio/bosonai/higgs-audio-v3-tts-4b
+ComfyUI/models/LLM/bosonai/higgs-audio-v3-tts-4b
+```
+
+If you use `extra_model_paths.yaml`, the loader also scans `higgs_audio`, `llm`, and `LLM` entries. A workflow value of `bosonai/higgs-audio-v3-tts-4b` will resolve to the local directory first when one exists, and only falls back to Hugging Face when no local model folder is found.
+
 By default the loader starts a node-managed Python worker using the current Python executable. If SGLang-Omni is installed in a different Python environment, configure it with environment variables before starting ComfyUI:
 
 ```text

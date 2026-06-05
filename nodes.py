@@ -44,6 +44,9 @@ DEFAULT_DISABLE_CUDA_GRAPH = True
 DEFAULT_STARTUP_TIMEOUT_SECONDS = 600
 RESPONSE_MODES = ["standard_wav", "stream_sse_wav", "stream_pcm"]
 LOCAL_MODEL_TYPE = "HIGGS_AUDIO_V3_MODEL"
+HIGGS_MODEL_FOLDER = "higgs_audio"
+HIGGS_MODEL_FOLDER_NAMES = (HIGGS_MODEL_FOLDER, "llm", "LLM")
+HIGGS_MODEL_MARKER_FILES = ("config.json", "model_index.json", "generation_config.json")
 _LOCAL_MODEL_CACHE: dict[tuple[Any, ...], Any] = {}
 _WORKER_MARKER = "__HIGGS_AUDIO_V3_JSON__"
 
@@ -71,6 +74,140 @@ def _higgs_runtime_config() -> dict[str, Any]:
             os.getenv("HIGGS_AUDIO_V3_STARTUP_TIMEOUT_SECONDS", str(DEFAULT_STARTUP_TIMEOUT_SECONDS))
         ),
     }
+
+
+def _register_higgs_model_folder() -> None:
+    if folder_paths is None:
+        return
+    try:
+        default_dir = os.path.join(folder_paths.models_dir, HIGGS_MODEL_FOLDER)
+        folder_paths.add_model_folder_path(HIGGS_MODEL_FOLDER, default_dir, is_default=True)
+    except Exception:
+        pass
+
+
+def _dedupe_paths(paths: list[str]) -> list[str]:
+    seen = set()
+    out = []
+    for path in paths:
+        if not path:
+            continue
+        normalized = os.path.normcase(os.path.abspath(os.path.expanduser(path)))
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        out.append(path)
+    return out
+
+
+def _folder_paths_for(folder_name: str) -> list[str]:
+    if folder_paths is None:
+        return []
+    try:
+        return folder_paths.get_folder_paths(folder_name)
+    except Exception:
+        return []
+
+
+def _higgs_model_roots() -> list[str]:
+    roots: list[str] = []
+    if folder_paths is not None:
+        for folder_name in HIGGS_MODEL_FOLDER_NAMES:
+            roots.extend(_folder_paths_for(folder_name))
+        for folder_name in HIGGS_MODEL_FOLDER_NAMES:
+            try:
+                roots.append(os.path.join(folder_paths.models_dir, folder_name))
+            except Exception:
+                pass
+    return _dedupe_paths(roots)
+
+
+def _is_higgs_named_path(path: str) -> bool:
+    normalized = path.replace("\\", "/").lower()
+    return "higgs" in normalized or "bosonai" in normalized or "audio-v3" in normalized
+
+
+def _is_model_dir(path: str) -> bool:
+    return os.path.isdir(path) and any(os.path.isfile(os.path.join(path, marker)) for marker in HIGGS_MODEL_MARKER_FILES)
+
+
+def _is_higgs_model_dir(path: str, *, allow_generic: bool = False) -> bool:
+    if not _is_model_dir(path):
+        return False
+    return allow_generic or _is_higgs_named_path(path)
+
+
+def _path_depth(root: str, path: str) -> int:
+    rel = os.path.relpath(path, root)
+    if rel == ".":
+        return 0
+    return len(rel.split(os.sep))
+
+
+def _display_model_name(root: str, path: str) -> str:
+    rel = os.path.relpath(path, root)
+    if rel == ".":
+        return os.path.basename(os.path.normpath(path))
+    return rel.replace(os.sep, "/")
+
+
+def _iter_higgs_model_dirs() -> list[tuple[str, str]]:
+    found: list[tuple[str, str]] = []
+    for root in _higgs_model_roots():
+        if not os.path.isdir(root):
+            continue
+        root_is_higgs_bucket = os.path.basename(os.path.normpath(root)).lower() == HIGGS_MODEL_FOLDER
+        for dirpath, dirnames, _filenames in os.walk(root, followlinks=True):
+            dirnames[:] = [d for d in dirnames if d not in {".cache", ".git", "__pycache__"}]
+            depth = _path_depth(root, dirpath)
+            if depth > 2:
+                dirnames[:] = []
+                continue
+            if _is_higgs_model_dir(dirpath, allow_generic=root_is_higgs_bucket):
+                found.append((_display_model_name(root, dirpath), dirpath))
+                dirnames[:] = []
+    return found
+
+
+def _higgs_model_choices() -> list[str]:
+    choices: list[str] = []
+    for display_name, _path in _iter_higgs_model_dirs():
+        if display_name not in choices:
+            choices.append(display_name)
+    if DEFAULT_MODEL_PATH not in choices:
+        choices.append(DEFAULT_MODEL_PATH)
+    return choices
+
+
+def _resolve_higgs_model_path(model_path: str) -> str:
+    selected = (model_path or DEFAULT_MODEL_PATH).strip() or DEFAULT_MODEL_PATH
+    expanded = os.path.expanduser(selected)
+    if os.path.isabs(expanded) and os.path.isdir(expanded):
+        return expanded
+
+    normalized = selected.replace("\\", "/").strip("/")
+    aliases = [normalized]
+    if normalized == DEFAULT_MODEL_PATH:
+        aliases.append(os.path.basename(DEFAULT_MODEL_PATH))
+
+    for root in _higgs_model_roots():
+        if not os.path.isdir(root):
+            continue
+        root_is_higgs_bucket = os.path.basename(os.path.normpath(root)).lower() == HIGGS_MODEL_FOLDER
+        for alias in aliases:
+            candidate = os.path.join(root, *alias.split("/"))
+            if _is_higgs_model_dir(candidate, allow_generic=root_is_higgs_bucket):
+                return candidate
+
+    for display_name, path in _iter_higgs_model_dirs():
+        if display_name == normalized or os.path.basename(os.path.normpath(path)) == normalized:
+            return path
+        if normalized == DEFAULT_MODEL_PATH and os.path.basename(os.path.normpath(path)) == os.path.basename(DEFAULT_MODEL_PATH):
+            return path
+    return selected
+
+
+_register_higgs_model_folder()
 
 
 def _clean_server_url(server_url: str) -> str:
@@ -694,13 +831,14 @@ class HiggsAudioV3TTS:
 class HiggsAudioV3ModelLoader:
     @classmethod
     def INPUT_TYPES(cls):
+        model_choices = _higgs_model_choices()
         return {
             "required": {
                 "model_path": (
-                    "STRING",
+                    model_choices,
                     {
-                        "default": DEFAULT_MODEL_PATH,
-                        "tooltip": "Hugging Face model id or local model directory.",
+                        "default": model_choices[0],
+                        "tooltip": "Local ComfyUI model folder is preferred. Falls back to Hugging Face model id if no local copy is found.",
                     },
                 ),
                 "device": (["cuda", "cpu"], {"default": "cuda"}),
@@ -726,11 +864,12 @@ class HiggsAudioV3ModelLoader:
         disable_cuda_graph = runtime_config["disable_cuda_graph"]
         startup_timeout_seconds = runtime_config["startup_timeout_seconds"]
 
-        model_path = (model_path or DEFAULT_MODEL_PATH).strip()
+        selected_model_path = (model_path or DEFAULT_MODEL_PATH).strip() or DEFAULT_MODEL_PATH
+        resolved_model_path = _resolve_higgs_model_path(selected_model_path)
         key = (
             runtime_mode,
             (python_executable or "python").strip(),
-            model_path,
+            resolved_model_path,
             (sglang_omni_python_path or "").strip(),
             device,
             attention_backend,
@@ -742,7 +881,7 @@ class HiggsAudioV3ModelLoader:
             if runtime_mode == "python_worker":
                 model = HiggsAudioV3WorkerPipeline(
                     python_executable=python_executable,
-                    model_path=model_path,
+                    model_path=resolved_model_path,
                     sglang_omni_python_path=sglang_omni_python_path,
                     device=device,
                     attention_backend=attention_backend,
@@ -751,7 +890,7 @@ class HiggsAudioV3ModelLoader:
                 )
             elif runtime_mode == "in_process":
                 model = HiggsAudioV3LocalPipeline(
-                    model_path=model_path,
+                    model_path=resolved_model_path,
                     sglang_omni_python_path=sglang_omni_python_path,
                     device=device,
                     attention_backend=attention_backend,
@@ -764,7 +903,9 @@ class HiggsAudioV3ModelLoader:
             _LOCAL_MODEL_CACHE[key] = model
 
         info = {
-            "model_path": model_path,
+            "model_path": selected_model_path,
+            "resolved_model_path": resolved_model_path,
+            "model_source": "local_comfy_model_path" if os.path.isdir(resolved_model_path) else "huggingface_or_custom_path",
             "runtime_mode": runtime_mode,
             "device": device,
             "mode": "local_pipeline",

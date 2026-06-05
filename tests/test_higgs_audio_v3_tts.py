@@ -16,6 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(__file__))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+import nodes  # noqa: E402
 from nodes import HiggsAudioV3LocalTTS, HiggsAudioV3ModelLoader, HiggsAudioV3TTS  # noqa: E402
 
 
@@ -167,3 +168,13 @@ def test_model_loader_ui_hides_runtime_internals():
     assert "attention_backend" not in inputs
     assert "disable_cuda_graph" not in inputs
     assert "startup_timeout_seconds" not in inputs
+
+
+def test_model_path_prefers_local_comfy_model_folder(tmp_path, monkeypatch):
+    model_dir = tmp_path / "LLM" / "bosonai" / "higgs-audio-v3-tts-4b"
+    model_dir.mkdir(parents=True)
+    (model_dir / "config.json").write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(nodes, "_higgs_model_roots", lambda: [str(tmp_path / "LLM")])
+
+    assert nodes._resolve_higgs_model_path("bosonai/higgs-audio-v3-tts-4b") == str(model_dir)
