@@ -17,7 +17,6 @@ This starts and reuses a Higgs Audio v3 pipeline from inside ComfyUI. You do not
 - Multilingual text input supported by Higgs Audio v3.
 - Inline Higgs control tokens such as `<|emotion:amusement|>`, `<|style:whispering|>`, `<|prosody:pause|>`, and `<|sfx:laughter|>`.
 - ComfyUI model-folder lookup through `models/higgs_audio`, `models/LLM`, and `extra_model_paths.yaml`.
-- Optional HTTP API node for users who already run an external SGLang-Omni server.
 
 Higgs Audio v3 is released by Boson AI for research and non-commercial use. Review the model license before using generated audio.
 
@@ -52,12 +51,6 @@ Outputs:
 
 - `audio`: native ComfyUI `AUDIO`.
 - `request_json`: JSON payload used for generation.
-
-### Higgs Audio V3 TTS
-
-Optional compatibility node for an external SGLang-Omni `/v1/audio/speech` server.
-
-Use this only when you intentionally want to run Higgs as a separate HTTP service.
 
 ## Install
 
@@ -189,53 +182,13 @@ Voice cloning:
 2. Add the transcript to `reference_text`.
 3. Generate with `Higgs Audio V3 Local TTS`.
 
-## Optional External Server Mode
-
-The `Higgs Audio V3 TTS` node can call an external `/v1/audio/speech` server.
-
-Use this when you intentionally want one shared Higgs service for multiple ComfyUI sessions or machines.
-
-Typical request endpoint:
-
-```text
-http://127.0.0.1:8000/v1/audio/speech
-```
-
-The external-server node supports:
-
-- `response_mode=standard_wav`
-- `response_mode=stream_sse_wav`
-- `response_mode=stream_pcm`
-- reference audio payloads
-
-The local loader workflow is usually simpler because it does not require a separately managed HTTP server.
-
 ## Test
 
-Unit tests use a local mock `/v1/audio/speech` server and do not download the model:
+Unit tests use a fake local model and do not download the model:
 
 ```bash
 cd /path/to/ComfyUI/custom_nodes/ComfyUI-HiggsAudioV3TTS
 python -m pytest -q
-```
-
-Fallback test runner:
-
-```bash
-python scripts/run_mock_tests.py
-```
-
-Live HTTP server tests are available for external-server mode:
-
-```bash
-python scripts/run_live_higgs_tests.py \
-  --base-url http://127.0.0.1:8000 \
-  --reference-audio docs/_static/audio/male-voice.wav \
-  --out-dir /tmp/higgs_audio_tests
-
-python scripts/run_comfy_node_live_tests.py \
-  --base-url http://127.0.0.1:8000 \
-  --out-dir /tmp/higgs_comfy_node_tests
 ```
 
 ## Troubleshooting
@@ -277,7 +230,6 @@ ComfyUI-HiggsAudioV3TTS/
   local_worker.py
   js/
   examples/
-  scripts/
   tests/
   requirements.txt
 ```

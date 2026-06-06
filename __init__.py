@@ -1,15 +1,13 @@
-from .nodes import HiggsAudioV3LocalTTS, HiggsAudioV3ModelLoader, HiggsAudioV3TTS
+from .nodes import HiggsAudioV3LocalTTS, HiggsAudioV3ModelLoader
 
 WEB_DIRECTORY = "./js"
 
 NODE_CLASS_MAPPINGS = {
-    "HiggsAudioV3TTS": HiggsAudioV3TTS,
     "HiggsAudioV3ModelLoader": HiggsAudioV3ModelLoader,
     "HiggsAudioV3LocalTTS": HiggsAudioV3LocalTTS,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "HiggsAudioV3TTS": "Higgs Audio V3 TTS",
     "HiggsAudioV3ModelLoader": "Higgs Audio V3 Model Loader",
     "HiggsAudioV3LocalTTS": "Higgs Audio V3 Local TTS",
 }
