@@ -1,29 +1,73 @@
 # ComfyUI-HiggsAudioV3TTS
 
-ComfyUI custom node for `bosonai/higgs-audio-v3-tts-4b`.
+ComfyUI custom nodes for `bosonai/higgs-audio-v3-tts-4b`.
 
-The node talks to the official SGLang-Omni `/v1/audio/speech` API and returns native ComfyUI `AUDIO`, so it can be connected directly to the built-in `PreviewAudio`, `Save Audio (FLAC)`, `Save Audio (MP3)`, and audio/video nodes.
+The primary workflow is a local ComfyUI-style model loader:
 
-## What It Supports
+```text
+Higgs Audio V3 Model Loader -> Higgs Audio V3 Local TTS -> SaveAudio
+```
 
-- Zero-shot text-to-speech
-- Voice cloning through `references`
-- SSE streaming WAV chunks
-- Raw PCM streaming
-- Direct local pipeline mode with a ComfyUI-style model loader node
-- Inline Higgs control tokens such as `<|emotion:amusement|>`, `<|style:shouting|>`, `<|prosody:pause|>`, and `<|sfx:laughter|>Haha`
+This starts and reuses a Higgs Audio v3 pipeline from inside ComfyUI. You do not need to manually run a separate `sgl-omni serve` process for the included local workflows.
+
+## Features
+
+- Zero-shot text-to-speech.
+- Voice cloning from a connected ComfyUI `AUDIO` input.
+- Multilingual text input supported by Higgs Audio v3.
+- Inline Higgs control tokens such as `<|emotion:amusement|>`, `<|style:whispering|>`, `<|prosody:pause|>`, and `<|sfx:laughter|>`.
+- ComfyUI model-folder lookup through `models/higgs_audio`, `models/LLM`, and `extra_model_paths.yaml`.
+- Optional HTTP API node for users who already run an external SGLang-Omni server.
 
 Higgs Audio v3 is released by Boson AI for research and non-commercial use. Review the model license before using generated audio.
 
+## Nodes
+
+### Higgs Audio V3 Model Loader
+
+Loads the model once and returns a reusable `HIGGS_AUDIO_V3_MODEL` object.
+
+Inputs:
+
+- `model_path`: local model choice or Hugging Face model id. Local ComfyUI model folders are preferred.
+- `device`: `cuda` or `cpu`.
+
+Hidden runtime settings are configured through environment variables, not exposed as normal ComfyUI widgets.
+
+### Higgs Audio V3 Local TTS
+
+Generates audio through a model loaded by `Higgs Audio V3 Model Loader`.
+
+Inputs:
+
+- `model`: output from `Higgs Audio V3 Model Loader`.
+- `text`: text to synthesize. Higgs control tokens are supported.
+- `temperature`, `top_k`, `max_new_tokens`: sampling controls.
+- `timeout_seconds`: per-request timeout.
+- `reference_audio`: optional connected ComfyUI `AUDIO` for voice cloning.
+- `reference_audio_path`: optional local path visible to the Higgs runtime.
+- `reference_text`: transcript for the reference audio.
+
+Outputs:
+
+- `audio`: native ComfyUI `AUDIO`.
+- `request_json`: JSON payload used for generation.
+
+### Higgs Audio V3 TTS
+
+Optional compatibility node for an external SGLang-Omni `/v1/audio/speech` server.
+
+Use this only when you intentionally want to run Higgs as a separate HTTP service.
+
 ## Install
 
-Place this folder in:
+Place this repository in:
 
 ```text
 ComfyUI/custom_nodes/ComfyUI-HiggsAudioV3TTS
 ```
 
-Install the small client-side requirements in the same Python environment used by ComfyUI:
+Install the node requirements in the same Python environment used by ComfyUI:
 
 ```bash
 cd /path/to/ComfyUI
@@ -31,125 +75,140 @@ source /path/to/comfyui-venv/bin/activate
 pip install -r custom_nodes/ComfyUI-HiggsAudioV3TTS/requirements.txt
 ```
 
-## Direct Local Pipeline Mode
+Restart ComfyUI after installing.
 
-You do not have to manually run `sgl-omni serve` if you use:
+## Model Placement
+
+The loader resolves local model folders before falling back to Hugging Face. This prevents unnecessary downloads when a complete local snapshot exists.
+
+Recommended layout:
 
 ```text
-Higgs Audio V3 Model Loader -> Higgs Audio V3 Local TTS -> SaveAudio
+ComfyUI/models/higgs_audio/bosonai/higgs-audio-v3-tts-4b
 ```
 
-This mode starts a local Higgs pipeline managed by the ComfyUI node and calls it directly, without exposing an HTTP server. The loader UI intentionally stays small: `model_path` and `device`.
+Also supported:
 
-The `model_path` widget follows the usual ComfyUI model-directory pattern. Put a local copy under either of these roots and select the relative model name in the loader:
+```text
+ComfyUI/models/LLM/bosonai/higgs-audio-v3-tts-4b
+ComfyUI/models/LLM/higgs-audio-v3-tts-4b
+```
+
+The model folder should contain a complete Hugging Face snapshot, including files such as `config.json` and the required model weights.
+
+If `extra_model_paths.yaml` defines any of these model categories, they are scanned too:
+
+```yaml
+my_models:
+  base_path: /path/to/models
+  higgs_audio: higgs_audio
+  LLM: llm
+  llm: llm
+```
+
+A workflow value of:
+
+```text
+bosonai/higgs-audio-v3-tts-4b
+```
+
+will first try local model folders such as:
 
 ```text
 ComfyUI/models/higgs_audio/bosonai/higgs-audio-v3-tts-4b
 ComfyUI/models/LLM/bosonai/higgs-audio-v3-tts-4b
 ```
 
-If you use `extra_model_paths.yaml`, the loader also scans `higgs_audio`, `llm`, and `LLM` entries. A workflow value of `bosonai/higgs-audio-v3-tts-4b` will resolve to the local directory first when one exists, and only falls back to Hugging Face when no local model folder is found.
+If no local folder is found, the Higgs runtime receives the original Hugging Face model id.
 
-By default the loader starts a node-managed Python worker using the current Python executable. If SGLang-Omni is installed in a different Python environment, configure it with environment variables before starting ComfyUI:
+## Runtime Configuration
+
+By default, the loader starts a node-managed Python worker using the current Python executable.
+
+If SGLang-Omni is installed in a different environment, set these environment variables before starting ComfyUI:
 
 ```text
-HIGGS_AUDIO_V3_PYTHON_EXECUTABLE=/path/to/python
 HIGGS_AUDIO_V3_RUNTIME_MODE=python_worker
-HIGGS_AUDIO_V3_SGLANG_OMNI_PYTHON_PATH=/optional/editable/checkout
+HIGGS_AUDIO_V3_PYTHON_EXECUTABLE=/path/to/python
+HIGGS_AUDIO_V3_SGLANG_OMNI_PYTHON_PATH=/optional/editable/sglang-omni
 HIGGS_AUDIO_V3_ATTENTION_BACKEND=triton
 HIGGS_AUDIO_V3_DISABLE_CUDA_GRAPH=true
 HIGGS_AUDIO_V3_STARTUP_TIMEOUT_SECONDS=600
 ```
 
-Use `HIGGS_AUDIO_V3_RUNTIME_MODE=in_process` only when SGLang-Omni is installed in the ComfyUI Python environment and its dependency versions are compatible.
+Use `HIGGS_AUDIO_V3_RUNTIME_MODE=in_process` only when SGLang-Omni is installed in the ComfyUI Python environment and dependency versions are compatible.
 
-## Start Higgs Server
+### WSL2 Notes
 
-The original `Higgs Audio V3 TTS` node can still talk to a separately served SGLang-Omni HTTP API. Use this mode when you want to share one Higgs service across multiple ComfyUI sessions or machines.
-
-```bash
-docker pull lmsysorg/sglang-omni:dev
-docker run -it --gpus all --shm-size 32g --ipc host --network host --privileged \
-  lmsysorg/sglang-omni:dev /bin/zsh
-```
-
-Inside the container:
-
-```bash
-git clone https://github.com/sgl-project/sglang-omni.git
-cd sglang-omni
-uv venv .venv -p 3.12
-source .venv/bin/activate
-uv pip install -v -e .
-hf download bosonai/higgs-audio-v3-tts-4b
-sgl-omni serve --model-path bosonai/higgs-audio-v3-tts-4b --port 8000
-```
-
-### WSL2 / No CUDA Toolkit Workaround
-
-On systems with a working PyTorch CUDA runtime but no local CUDA toolkit (`nvcc`), FlashInfer JIT may fail with:
+For WSL2 setups where PyTorch CUDA works but no local CUDA toolkit is installed, the recommended defaults are:
 
 ```text
-RuntimeError: Could not find nvcc and default cuda_home='/usr/local/cuda' doesn't exist
+HIGGS_AUDIO_V3_ATTENTION_BACKEND=triton
+HIGGS_AUDIO_V3_DISABLE_CUDA_GRAPH=true
 ```
 
-For this setup, serve Higgs with SGLang's Triton attention backend and CUDA graph disabled for the Higgs `tts_engine` stage. One way is to generate a config:
-
-```bash
-cd /path/to/sglang-omni
-source .venv/bin/activate
-python - <<'PY'
-from pathlib import Path
-import yaml
-from sglang_omni.config.manager import ConfigManager
-
-cfg = ConfigManager.from_model_path("bosonai/higgs-audio-v3-tts-4b").merge_config({})
-engine = cfg.stages[2]
-assert engine.name == "tts_engine"
-factory_args = dict(engine.factory_args or {})
-overrides = dict(factory_args.get("server_args_overrides") or {})
-overrides.update({"disable_cuda_graph": True, "attention_backend": "triton"})
-factory_args["server_args_overrides"] = overrides
-engine.factory_args = factory_args
-Path("higgs_triton_no_nvcc.yaml").write_text(
-    yaml.safe_dump(cfg.model_dump(mode="json"), sort_keys=False),
-    encoding="utf-8",
-)
-PY
-
-sgl-omni serve --config higgs_triton_no_nvcc.yaml --host 0.0.0.0 --port 8000
-```
-
-If you use reference audio from ComfyUI with a Docker-hosted server, make sure the container can read the reference path emitted by ComfyUI. The simplest setup is running SGLang-Omni directly in the same environment as ComfyUI, or mounting your ComfyUI directory into the container at a stable shared path.
-
-## Node Inputs
-
-- `server_url`: SGLang-Omni server URL, usually `http://127.0.0.1:8000`
-- `text`: speech text; inline Higgs control tokens are allowed
-- `response_mode`: `standard_wav`, `stream_sse_wav`, or `stream_pcm`
-- `reference_audio`: optional ComfyUI `AUDIO` for voice cloning
-- `reference_audio_path`: optional server-visible local path or URL for voice cloning
-- `reference_text`: transcript for the reference audio
-- `temperature`, `top_k`, `max_new_tokens`: sampling controls sent to the API
-- `Higgs Audio V3 Model Loader`: local loader with `model_path` and `device`
-
-## Examples
-
-Zero-shot:
+When ComfyUI runs inside WSL2, Windows model paths are seen through WSL mounts, for example:
 
 ```text
-Hello, how are you?
+/mnt/<drive>/ComfyUI/models/higgs_audio/bosonai/higgs-audio-v3-tts-4b
 ```
 
-Inline control:
+## Workflows
+
+Example workflows are in:
 
 ```text
-<|emotion:amusement|><|prosody:expressive_high|>Wait, wait, that was hilarious. <|sfx:laughter|>Hehe, I was not ready for that.
+examples/
+```
+
+Included files:
+
+- `higgs_audio_v3_tts_local_model_workflow.json`: minimal local loader -> local TTS -> SaveAudio workflow.
+- `higgs_audio_v3_tts_local_features_workflow.json`: local workflow covering generated reference audio, multilingual text, and inline control tokens.
+- `examples/README.md`: quick notes for loading the workflow files.
+
+These are ComfyUI UI workflow files. Drag them into the ComfyUI canvas.
+
+## Prompt Examples
+
+Basic:
+
+```text
+Hello, this is Higgs Audio v3 running directly inside ComfyUI.
+```
+
+Inline controls:
+
+```text
+<|emotion:amusement|>That was unexpectedly fun. <|prosody:pause|><|style:whispering|>Now this part is quieter.
 ```
 
 Voice cloning:
 
-Connect an `AUDIO` node to `reference_audio`, enter the transcript in `reference_text`, then run the node.
+1. Connect a ComfyUI `AUDIO` output to `reference_audio`.
+2. Add the transcript to `reference_text`.
+3. Generate with `Higgs Audio V3 Local TTS`.
+
+## Optional External Server Mode
+
+The `Higgs Audio V3 TTS` node can call an external `/v1/audio/speech` server.
+
+Use this when you intentionally want one shared Higgs service for multiple ComfyUI sessions or machines.
+
+Typical request endpoint:
+
+```text
+http://127.0.0.1:8000/v1/audio/speech
+```
+
+The external-server node supports:
+
+- `response_mode=standard_wav`
+- `response_mode=stream_sse_wav`
+- `response_mode=stream_pcm`
+- reference audio payloads
+
+The local loader workflow is usually simpler because it does not require a separately managed HTTP server.
 
 ## Test
 
@@ -157,50 +216,70 @@ Unit tests use a local mock `/v1/audio/speech` server and do not download the mo
 
 ```bash
 cd /path/to/ComfyUI/custom_nodes/ComfyUI-HiggsAudioV3TTS
-source /path/to/comfyui-venv/bin/activate
 python -m pytest -q
 ```
 
-If `pytest` is not installed in the ComfyUI environment:
+Fallback test runner:
 
 ```bash
 python scripts/run_mock_tests.py
 ```
 
-## Real Model Smoke Tests
-
-After the SGLang-Omni server is running on port 8000, test the same API modes used by the ComfyUI node:
+Live HTTP server tests are available for external-server mode:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/v1/audio/speech \
-  -H "Content-Type: application/json" \
-  -d '{"input": "Hello, how are you?"}' \
-  --output higgs_zero_shot.wav
-
-curl -X POST http://127.0.0.1:8000/v1/audio/speech \
-  -H "Content-Type: application/json" \
-  -d '{"input": "<|emotion:amusement|><|prosody:expressive_high|>Wait, wait, that was hilarious. <|sfx:laughter|>Hehe.", "temperature": 0.8, "top_k": 50, "max_new_tokens": 1024}' \
-  --output higgs_control_tokens.wav
-```
-
-Then run the ComfyUI node with:
-
-- `response_mode=standard_wav`
-- `response_mode=stream_sse_wav`
-- `response_mode=stream_pcm`
-- `reference_audio` connected, plus `reference_text`
-
-The repo also includes executable smoke tests:
-
-```bash
-# Tests the official API modes against a running SGLang-Omni server.
 python scripts/run_live_higgs_tests.py \
   --base-url http://127.0.0.1:8000 \
   --reference-audio docs/_static/audio/male-voice.wav \
   --out-dir /tmp/higgs_audio_tests
 
-# Tests the ComfyUI node class for the streaming modes.
 python scripts/run_comfy_node_live_tests.py \
   --base-url http://127.0.0.1:8000 \
   --out-dir /tmp/higgs_comfy_node_tests
 ```
+
+## Troubleshooting
+
+### The loader still downloads from Hugging Face
+
+Check that the model folder exists under a scanned root:
+
+```text
+ComfyUI/models/higgs_audio/bosonai/higgs-audio-v3-tts-4b
+ComfyUI/models/LLM/bosonai/higgs-audio-v3-tts-4b
+```
+
+The folder must be a complete model snapshot. Restart ComfyUI to refresh the model dropdown.
+
+### The model loader dropdown only shows `bosonai/higgs-audio-v3-tts-4b`
+
+No local Higgs model folder was found. The workflow can still run through Hugging Face cache/download behavior, but local model-folder resolution requires a complete local model directory.
+
+### CUDA toolkit / `nvcc` errors
+
+Set:
+
+```text
+HIGGS_AUDIO_V3_ATTENTION_BACKEND=triton
+HIGGS_AUDIO_V3_DISABLE_CUDA_GRAPH=true
+```
+
+### Reference audio path problems
+
+Prefer connecting ComfyUI `AUDIO` directly to `reference_audio`. Use `reference_audio_path` only when the Higgs runtime can read that path from the same filesystem.
+
+## Repository Layout
+
+```text
+ComfyUI-HiggsAudioV3TTS/
+  __init__.py
+  nodes.py
+  local_worker.py
+  js/
+  examples/
+  scripts/
+  tests/
+  requirements.txt
+```
+
+`js/workflow_dragdrop_compat.js` keeps the included UI workflow JSON files drag-and-drop friendly in current ComfyUI frontends.
